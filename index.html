@@ -2,283 +2,292 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Симулятор БПЛА «Shahed-236 Seeker»</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Симулятор БПЛА: Операция Перехват</title>
+    <!-- Подключаем библиотеку Three.js для полноценной 3D графики в браузере -->
+    <script src="https://cloudflare.com"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #0b0f19;
+            background-color: #05070a;
             color: #00ff66;
             font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            overflow: hidden;
             user-select: none;
         }
 
-        h2 {
-            margin-top: 15px;
-            text-shadow: 0 0 10px #00ff66;
-            font-size: 22px;
-        }
-
-        #screen {
-            width: 800px;
-            height: 500px;
-            background-color: #05070a;
-            border: 4px solid #334455;
-            box-shadow: 0 0 20px rgba(0, 255, 102, 0.2);
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* ЭКРАН КАРТЫ */
-        #map-view {
-            width: 100%;
-            height: 100%;
-            background-image: radial-gradient(#111d15 1px, transparent 1px);
-            background-size: 20px 20px;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        /* ЭКРАН КАМЕРЫ (ТЕПЛОВИЗОР) */
-        #camera-view {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(rgba(30,30,30,1), rgba(10,10,10,1));
-            position: absolute;
-            top: 0;
-            left: 0;
-            display: none;
-            filter: grayscale(1) contrast(1.6);
-        }
-
-        /* Эффект шума и развертки тепловизора */
-        #camera-view::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
-            z-index: 2;
-            background-size: 100% 4px, 3px 100%;
-        }
-
-        /* ЭЛЕМЕНТЫ ТАКТИЧЕСКОЙ КАРТЫ */
-        .dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            position: absolute;
-            transform: translate(-50%, -50%);
-            z-index: 5;
-        }
-        #start-point { left: 100px; top: 350px; background-color: #ff3333; box-shadow: 0 0 12px #ff3333; }
-        #target-point { left: 700px; top: 120px; background-color: #3333ff; box-shadow: 0 0 12px #3333ff; }
-
-        #drone {
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 22px solid #00ff66;
-            position: absolute;
-            left: 100px;
-            top: 350px;
-            transform: translate(-50%, -50%) rotate(45deg);
-            z-index: 10;
-            transition: transform 0.1s linear;
-        }
-
-        svg {
+        /* ЭКРАН ВЫБОРА (АНГАР) */
+        #hangar-screen {
             position: absolute;
             width: 100%;
             height: 100%;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-        }
-        #route-line {
-            stroke: #00ff66;
-            stroke-width: 3;
-            fill: none;
-            stroke-dasharray: 6;
-        }
-
-        /* МИНИ-КАРТА НА СТРАНИЦЕ КАМЕРЫ */
-        #mini-map {
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
-            width: 160px;
-            height: 110px;
-            border: 2px solid #00ff66;
-            background-color: rgba(0,0,0,0.85);
-            z-index: 5;
-            display: none;
-        }
-        .mini-map-title { color:#00ff66; font-size:9px; padding:4px; border-bottom: 1px solid #00ff66; text-align: center;}
-        .mini-start { left: 25px; top: 80px; width:6px; height:6px; background:#ff3333; }
-        .mini-target { left: 135px; top: 30px; width:6px; height:6px; background:#3333ff; }
-
-        /* ИНТЕРФЕЙС ТЕПЛОВИЗОРА */
-        #thermal-target {
-            position: absolute;
-            top: 35%;
-            left: 52%;
-            transform: translate(-50%, -50%);
-            width: 90px;
-            height: 45px;
-            background: #ffffff;
-            box-shadow: 0 0 35px #ffffff;
-            border-radius: 4px;
+            background-color: rgba(5, 7, 10, 0.95);
+            z-index: 100;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #000;
-            font-weight: bold;
-            font-size: 11px;
+            padding: 20px;
+            box-sizing: border-box;
         }
-        .crosshair-h { position:absolute; top:50%; left:50%; width:60px; height:2px; background:#fff; transform:translate(-50%,-50%); z-index: 3;}
-        .crosshair-v { position:absolute; top:50%; left:50%; width:2px; height:60px; background:#fff; transform:translate(-50%,-50%); z-index: 3;}
 
-        /* ПАНЕЛИ ТЕЛЕМЕТРИИ (HUD) */
-        .hud-text {
-            position: absolute;
-            top: 12px;
-            left: 15px;
-            z-index: 10;
-            text-shadow: 1px 1px 3px #000;
-            font-size: 13px;
-            width: 95%;
+        .hangar-title {
+            font-size: 18px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ff66;
+            text-align: center;
+        }
+
+        .cards-container {
             display: flex;
-            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 900px;
         }
 
-        /* КНОПКИ УПРАВЛЕНИЯ */
-        #controls { margin-top: 15px; display: flex; gap: 15px; }
-        #action-buttons { margin-top: 12px; display: flex; gap: 15px; }
+        .card {
+            background-color: #111625;
+            border: 2px solid #334455;
+            border-radius: 8px;
+            padding: 15px;
+            width: 260px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .card:hover {
+            border-color: #00ff66;
+            background-color: #162035;
+            box-shadow: 0 0 15px rgba(0,255,102,0.3);
+        }
+
+        .card h3 { margin: 0 0 8px 0; font-size: 14px; color: #fff; }
+        .card p { margin: 4px 0; font-size: 11px; color: #8899a6; }
+
+        /* ИНТЕРФЕЙС ПУЛЬТА УПРАВЛЕНИЯ */
+        #ui-container {
+            display: none;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            box-sizing: border-box;
+            padding: 15px;
+        }
+
+        .hud-panel {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(4, 6, 9, 0.85);
+            border: 2px solid #334455;
+            padding: 10px;
+            font-size: 12px;
+            pointer-events: auto;
+        }
+
+        .controls-panel {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
 
         button {
             background-color: #1a233a;
             color: #00ff66;
             border: 2px solid #00ff66;
-            padding: 10px 18px;
-            font-size: 14px;
+            padding: 10px 15px;
+            font-size: 12px;
             font-family: inherit;
             font-weight: bold;
             cursor: pointer;
-            transition: 0.15s ease-in-out;
+            border-radius: 4px;
+            touch-action: manipulation;
         }
-        button:hover { background-color: #00ff66; color: #000; box-shadow: 0 0 12px #00ff66; }
-        button.active { background-color: #00aa44; color: #fff; border-color: #00ff6a; }
 
-        /* ТЕРМИНАЛ СИСТЕМНЫХ ЛОГОВ */
-        #log-panel {
-            width: 800px;
-            height: 120px;
-            background-color: #040609;
-            border: 2px solid #334455;
-            margin-top: 15px;
-            box-sizing: border-box;
-            padding: 10px;
-            overflow-y: auto;
-            font-size: 13px;
-            line-height: 1.5;
+        button:hover {
+            background-color: #00ff66;
+            color: #000;
+            box-shadow: 0 0 10px #00ff66;
         }
-        .log-warn { color: #ffcc00; }
-        .log-crit { color: #ff3333; }
+
+        #log-panel {
+            position: absolute;
+            bottom: 70px;
+            left: 15px;
+            width: calc(100% - 30px);
+            max-width: 400px;
+            height: 80px;
+            background: rgba(4, 6, 9, 0.85);
+            border: 2px solid #334455;
+            padding: 8px;
+            overflow-y: auto;
+            font-size: 11px;
+            pointer-events: auto;
+        }
+
+        /* Прицел для тепловизора и перехвата */
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px; height: 40px;
+            border: 2px dashed #ff3333;
+            border-radius: 50%;
+            display: none;
+        }
+        #crosshair::before {
+            content: ''; position: absolute; top: 19px; left: 0; width: 40px; height: 2px; background: #ff3333;
+        }
+        #crosshair::after {
+            content: ''; position: absolute; left: 19px; top: 0; width: 2px; height: 40px; background: #ff3333;
+        }
+
+        /* 3D холст */
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
     </style>
 </head>
 <body>
 
-    <h2>ПУЛЬТ ОПЕРАТОРА БПЛА «SHAHED-236 SEEKER»</h2>
-
-    <!-- ЭКРАН ТЕЛЕМЕТРИИ И ТАКТИЧЕСКИХ ДАННЫХ -->
-    <div id="screen">
-        <div class="hud-text">
-            <div>⚙️ РЕЖИМ: <span id="hud-mode">АВТОМАРШРУТ</span> | ⚡ БАТАРЕЯ: <span id="hud-bat">100%</span></div>
-            <div>⛽ ТОПЛИВО: <span id="hud-fuel">100.0%</span> | 🧭 КУРС: <span id="hud-alt">1200 м</span></div>
-        </div>
-
-        <!-- 1. Навигационная Карта -->
-        <div id="map-view">
-            <div id="start-point" class="dot" title="Курск (Старт)"></div>
-            <div id="target-point" class="dot" title="Склад Логистики (Цель)"></div>
-            <div id="drone"></div>
-            <div id="click-markers"></div> 
-            
-            <svg id="svg-map">
-                <polyline id="route-line" points="" />
-            </svg>
-        </div>
-
-        <!-- 2. Тепловизор Seeker -->
-        <div id="camera-view">
-            <div id="thermal-target">ЦЕЛЬ: РЛС ПВО</div>
-            <div class="crosshair-h"></div>
-            <div class="crosshair-v"></div>
-            
-            <div id="mini-map">
-                <div class="mini-map-title">ТАКТИЧЕСКИЙ СЕКТОР</div>
-                <div class="dot mini-start"></div>
-                <div class="dot mini-target"></div>
+    <!-- ЭКРАН АНГАРА -->
+    <div id="hangar-screen">
+        <div class="hangar-title">ЦЕНТР БОЕВОГО УПРАВЛЕНИЯ — ТАКТИЧЕСКИЙ РЕЖИМ</div>
+        <div class="cards-container">
+            <!-- Новый дрон-перехватчик -->
+            <div class="card" onclick="start3DGame('p1sun')">
+                <h3>Дрон-перехватчик P-1SUN</h3>
+                <p>⚔️ Задача: Перехват воздушных целей</p>
+                <p>🚀 Скорость: Экстремальная (Форсаж)</p>
+                <p>👁️ Оптика: Автозахват целей</p>
+                <p>⏱️ Режим: Уничтожение разведывательных БПЛА</p>
+            </div>
+            <div class="card" onclick="start3DGame('seeker')">
+                <h3>БПЛА Shahed-236 «Сикер»</h3>
+                <p>⚔️ Задача: Удар по наземным объектам</p>
+                <p>🚀 Скорость: Крейсерская</p>
+                <p>👁️ Оптика: Тепловизор наведения</p>
+                <p>⏱️ Режим: Поиск и ликвидация РЛС</p>
             </div>
         </div>
     </div>
 
-    <!-- Основные кнопки пульта -->
-    <div id="controls">
-        <button id="btn-map" class="active" onclick="switchView('map')">[ КАРТА ]</button>
-        <button id="btn-camera" onclick="switchView('camera')">[ КАМЕРА ОПТИКИ ]</button>
-        <button id="btn-edit-route" onclick="toggleRouteEditing()" style="border-color: #ffcc00; color: #ffcc00;">[ ИЗМЕНИТЬ МАРШРУТ ]</button>
+    <!-- ТАКТИЧЕСКИЙ ПУЛЬТ (3D ИНТЕРФЕЙС) -->
+    <div id="ui-container">
+        <div class="hud-panel">
+            <div>БОРТ: <span id="hud-name">-</span></div>
+            <div>⛽ ТОПЛИВО: <span id="hud-fuel">100%</span></div>
+            <div>⏰ ВРЕМЯ СУТОК: <span id="hud-time">День</span></div>
+            <div>📊 СТАТУС: <span id="hud-status">Полет нормальный</span></div>
+        </div>
+
+        <div id="crosshair"></div>
+
+        <div id="log-panel">
+            <div>[СИСТЕМА]: Инициализация 3D пространства...</div>
+        </div>
+
+        <div class="controls-panel">
+            <button onclick="changeView('orbit')">[ НАВИГАЦИЯ КАРТЫ ]</button>
+            <button onclick="changeView('fpv')">[ КАМЕРА БПЛА ]</button>
+            <button id="btn-action" onclick="executeMissionAction()" style="border-color: #ff3333; color: #ff3333;">[ АТАКОВАТЬ ]</button>
+        </div>
     </div>
 
-    <!-- Чат-логи системы -->
-    <div id="log-panel">
-        <div>[СИСТЕМА]: Инициализация БПЛА... Бортовые системы в норме. Старт из района КУРСК.</div>
-        <div class="log-warn">[ВНИМАНИЕ]: Маршрут проходит через зону покрытия ПВО. Используйте кнопку «ИЗМЕНИТЬ МАРШРУТ», чтобы обойти радары по клику на карте!</div>
-    </div>
-
-    <!-- Дополнительный функционал -->
-    <div id="action-buttons">
-        <button onclick="resetToDefault()">Сбросить путь на базовый</button>
-        <button onclick="chooseAction('attack')" style="border-color: #ff3333; color: #ff3333;">НАВЕСТИ И АТАКОВАТЬ</button>
-    </div>
+    <!-- Контейнер для рендеринга 3D -->
+    <canvas id="canvas3d"></canvas>
 
     <script>
-        const mapView = document.getElementById('map-view');
-        const cameraView = document.getElementById('camera-view');
-        const miniMap = document.getElementById('mini-map');
-        const btnMap = document.getElementById('btn-map');
-        const btnCamera = document.getElementById('btn-camera');
-        const btnEditRoute = document.getElementById('btn-edit-route');
-        const drone = document.getElementById('drone');
-        const logPanel = document.getElementById('log-panel');
-        const routeLine = document.getElementById('route-line');
-        const clickMarkersContainer = document.getElementById('click-markers');
-
-        const hudFuel = document.getElementById('hud-fuel');
-        const hudBat = document.getElementById('hud-bat');
-        const hudAlt = document.getElementById('hud-alt');
-        const hudMode = document.getElementById('hud-mode');
-
-        // Стартовые параметры миссии
-        const startPoint = { x: 100, y: 350 };
-        const targetPoint = { x: 700, y: 120 };
-
-        let routeWaypoints = [];
-        let currentWaypointIndex = 0;
-        let isEditingRoute = false; 
-
-        let droneX = startPoint.x;
-        let droneY = startPoint.y;
+        let scene, camera, renderer;
+        let droneMesh, targetMesh;
+        let buildings = [];
+        let dirLight, hemiLight;
         
-        let fuel = 100.0;
-        let battery = 100;
-        let missionEnded = false;
+        let selectedDrone = '';
+        let fuel = 100;
+        let timeOfDay = 0; // Для цикла день/ночь
+        let cameraMode = 'orbit'; // orbit или fpv
+        let isGameActive = false;
 
-// Генерация стартового безопасного путиfunction generateBaseRoute() {clickMarkersContainer.innerHTML = '';routeWaypoints = [startPoint,{ x: 280, y: 410 },{ x: 490, y: 280 },{ x: 590, y: 190 },targetPoint];currentWaypointIndex = 0;updateRouteLineGraphic();}function updateRouteLineGraphic() {const pointsString = routeWaypoints.map(p => ${p.x},${p.y}).join(' ');routeLine.setAttribute('points', pointsString);}// Активация интерактивного изменения пути кнопкойfunction toggleRouteEditing() {if (missionEnded) return;if (cameraView.style.display === 'block') {addLog("[ОШИБКА]: Сначала вернитесь в режим [КАРТА] для изменения пути!", "log-crit");return;}isEditingRoute = !isEditingRoute;if (isEditingRoute) {btnEditRoute.style.backgroundColor = '#ffcc00';btnEditRoute.style.color = '#000';hudMode.innerText = "РЕДАКТИРОВАНИЕ";addLog("[ИНТЕРФЕЙС]: Режим прокладки пути ВКЛЮЧЕН. Кликом мыши ставьте новые точки на карте.", "log-warn");} else {btnEditRoute.style.backgroundColor = '#1a233a';btnEditRoute.style.color = '#ffcc00';hudMode.innerText = "АВТОМАРШРУТ";addLog("[ИНТЕРФЕЙС]: Путь зафиксирован. Автопилот ведет БПЛА по измененным координатам.");}}// Обработка кликов пользователя по карте для динамического изменения маршрутаmapView.addEventListener('click', function(event) {if (!isEditingRoute || missionEnded) return;if (event.target !== mapView && event.target.id !== 'svg-map') return;const rect = mapView.getBoundingClientRect();const clickX = event.clientX - rect.left;const clickY = event.clientY - rect.top;// Если начинаем перестраивать маршрут заново, точкой отсчета становится текущее местоположение дронаif (currentWaypointIndex === 0 || routeWaypoints.length <= 2) {clickMarkersContainer.innerHTML = '';routeWaypoints = [{ x: droneX, y: droneY }];currentWaypointIndex = 0;} else {routeWaypoints.pop(); // Временно удаляем финишную точку, чтобы вставить промежуточную}// Вставляем точку кликаrouteWaypoints.push({ x: clickX, y: clickY });routeWaypoints.push(targetPoint); // Возвращаем финальную синюю точку в конец// Рисуем физический маркер на картеconst marker = document.createElement('div');marker.className = 'dot';marker.style.backgroundColor = '#ffcc00';marker.style.width = '8px';marker.style.height = '8px';marker.style.left = clickX + 'px';marker.style.top = clickY + 'px';clickMarkersContainer.appendChild(marker);updateRouteLineGraphic();addLog([МАРШРУТ]: Добавлена точка ручной траектории (X: ${Math.round(clickX)}, Y: ${Math.round(clickY)}). Повышен расход топлива.);});// Главный цикл автопилота, расхода топлива и энергииfunction flightAutopilot() {if (missionEnded) return;// Каждая точка пути тратит топливо на полет, ручное изменение удлиняет путьif (fuel > 0) {fuel -= 0.02;hudFuel.innerText = Math.max(0, fuel).toFixed(1) + "%";} else {missionEnded = true;addLog("[КРИТИЧЕСКАЯ ОШИБКА]: Топливо полностью исчерпано! Дрон потерял скорость и упал.", "log-crit");alert("Миссия провалена: закончилось топливо!");return;}// Если открыт тепловизор, активно расходуется батарея оптикиif (cameraView.style.display === 'block') {if (battery > 0) {battery -= 0.1;hudBat.innerText = Math.floor(battery) + "%";} else {switchView('map');addLog("[ОТКАЗ СИСТЕМЫ]: Батарея оптики 0%. Тепловизор отключен. Доступна только карта!", "log-crit");}}if (currentWaypointIndex >= routeWaypoints.length) {hudMode.innerText = "ПРИБЫТИЕ";return;}const target = routeWaypoints[currentWaypointIndex];const dx = target.x - droneX;const dy = target.y - droneY;const distance = Math.sqrt(dx * dx + dy * dy);if (distance < 5) {currentWaypointIndex++;} else {const speed = 1.3; // Константная скорость движения иконки БПЛАdroneX += (dx / distance) * speed;droneY += (dy / distance) * speed;// Динамический разворот спрайта дрона по вектору движения к точкеconst angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;drone.style.left = droneX + 'px';drone.style.top = droneY + 'px';drone.style.transform = translate(-50%, -50%) rotate(${angle}deg);}}setInterval(flightAutopilot, 50);function resetToDefault() {if (missionEnded) return;generateBaseRoute();addLog("[МАРШРУТ]: Траектория автопилота успешно возвращена к заводским настройкам.");}// Переключение экранов Карта/Тепловизорfunction switchView(view) {if (missionEnded) return;if (view === 'map') {mapView.style.display = 'block';cameraView.style.display = 'none';miniMap.style.display = 'none';btnMap.classList.add('active');btnCamera.classList.remove('active');addLog("[ИНТЕРФЕЙС]: Главный монитор переключен в режим [ТАКТИЧЕСКАЯ КАРТА].");} else {if (battery <= 0) return;if (isEditingRoute) toggleRouteEditing();mapView.style.display = 'none';cameraView.style.display = 'block';miniMap.style.display = 'block';btnCamera.classList.add('active');btnMap.classList.remove('active');addLog("[ИНТЕРФЕЙС]: Активирована носовая ИК-камера. Видеопоток стабилен.");}}function addLog(text, className = "") {const div = document.createElement('div');if (className) div.className = className;div.innerText = text;logPanel.appendChild(div);logPanel.scrollTop = logPanel.scrollHeight;}// Финальная атакаfunction chooseAction(action) {if (missionEnded) return;if (action === 'attack') {missionEnded = true;hudMode.innerText = "ПИКИРОВАНИЕ";document.getElementById('thermal-target').style.background = '#ff3333';document.getElementById('thermal-target').style.color = '#fff';document.getElementById('thermal-target').innerText = "ЗАХВАТ ГСН!";addLog("[УДАР]: Оптическая головка самонаведения зафиксировала цель. Реактивный режим активирован, вход в пике!", "log-crit");setTimeout(() => {alert("Цель успешно уничтожена прямым попаданием Shahed-236! Операция завершена.");window.location.reload();}, 2500);}}// Запуск базовой логики при открытииgenerateBaseRoute();
+        const uiContainer = document.getElementById('ui-container');
+        const hangarScreen = document.getElementById('hangar-screen');
+        const logPanel = document.getElementById('log-panel');
+
+        function start3DGame(type) {
+            selectedDrone = type;
+            hangarScreen.style.display = 'none';
+            uiContainer.style.display = 'block';
+
+            document.getElementById('hud-name').innerText = type === 'p1sun' ? 'P-1SUN (Перехватчик)' : 'Shahed-236';
+            
+            if(type === 'p1sun') {
+                document.getElementById('btn-action').innerText = '[ ПЕРЕХВАТ ЦЕЛИ ]';
+                addLog("[МИССИЯ]: Обнаружен вражеский разведывательный БПЛА. Перехватчик P-1SUN запущен на перехват!");
+            } else {
+                document.getElementById('btn-action').innerText = '[ УДАР ПО РЛС ]';
+                addLog("[МИССИЯ]: Shahed-236 вышел на боевой курс. Цель — замаскированный узел РЛС.");
+            }
+
+            init3D();
+            isGameActive = true;
+        }
+
+        function init3D() {
+            // Создание сцены
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x05070a);
+            scene.fog = new THREE.FogExp2(0x05070a, 0.015);
+
+            // Камера
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 30, 50);
+
+            // Рендерер
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+
+            // Освещение (Основное для дня и ночи)
+            hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
+            scene.add(hemiLight);
+
+            dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(100, 100, 50);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            // Создание земли (Тактическая карта)
+            const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x111b15, roughness: 0.8 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ 3D ДОМОВ И ЗДАНИЙ
+            const buildingMat = new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.5 });
+            for (let i = 0; i < 60; i++) {
+                const bHeight = Math.random() * 15 + 5;
+                const bGeo = new THREE.BoxGeometry(6, bHeight, 6);
+                const building = new THREE.Mesh(bGeo, buildingMat);
+                
+                // Случайное рассеивание зданий по карте
+                building.position.x = (Math.random() - 0.5) * 200;
+                building.position.z = (Math.random() - 0.5) * 200;
+                building.position.y = bHeight / 2;
+                building.castShadow = true;
+                building.receiveShadow = true;scene.add(building);buildings.push(building);}// СОЗДАНИЕ НАШЕГО БПЛА (Моделька в виде треугольного крыла)const droneGeo = new THREE.ConeGeometry(2, 5, 3);const droneMat = new THREE.MeshStandardMaterial({ color: selectedDrone === 'p1sun' ? 0xffcc00 : 0x00ff66 });droneMesh = new THREE.Mesh(droneGeo, droneMat);droneMesh.rotation.x = Math.PI / 2;droneMesh.position.set(-40, 20, 30);scene.add(droneMesh);
+            // СОЗДАНИЕ ВРАЖЕСКОЙ ЦЕЛИconst targetGeo = selectedDrone === 'p1sun' ? new THREE.SphereGeometry(2, 8, 8) : new THREE.BoxGeometry(4, 4, 4);const targetMat = new THREE.MeshStandardMaterial({ color: 0xff3333, wireframe: true });targetMesh = new THREE.Mesh(targetGeo, targetMat);// Ставим цель вглубь зоныtargetMesh.position.set(40, selectedDrone === 'p1sun' ? 22 : 2, -40);scene.add(targetMesh);animate();}// АНИМАЦИОННЫЙ ДВИЖОК И ОБСЛУЖИВАНИЕ МЕХАНИКfunction animate() {if (!isGameActive) return;requestAnimationFrame(animate);// 1. ДИНАМИЧЕСКИЙ ЦИКЛ ДЕНЬ/НОЧЬtimeOfDay += 0.002;const lightIntensity = Math.sin(timeOfDay) * 0.5 + 0.5; // Плавные колебания освещенияdirLight.intensity = lightIntensity * 0.8;hemiLight.intensity = lightIntensity * 0.4 + 0.1;// Меняем текст HUD в зависимости от положения виртуального солнцаdocument.getElementById('hud-time').innerText = lightIntensity > 0.3 ? "День" : "Ночь";if (lightIntensity < 0.3) {scene.background.setHex(0x020305); // Ночное небо} else {scene.background.setHex(0x05070a); // Сумерки/День}
+            // 3. РАСХОД ТОПЛИВАif (fuel > 0) {fuel -= 0.02;document.getElementById('hud-fuel').innerText = Math.floor(fuel) + "%";} else {isGameActive = false;addLog("[КРИТИЧЕСКАЯ ОШИБКА]: Топливо исчерпано! Аппарат потерян.", "log-crit");alert("Миссия провалена: закончилось горючее.");window.location.reload();}
+
+            // 4. РЕЖИМЫ КАМЕРЫ ПУЛЬТАif (cameraMode === 'orbit') {// Обзорная навигационная камера сверху сценыcamera.position.set(droneMesh.position.x + 10, droneMesh.position.y + 25, droneMesh.position.z + 40);camera.lookAt(droneMesh.position);document.getElementById('crosshair').style.display = 'none';} else if (cameraMode === 'fpv') {// Камера «из глаз» / из носовой оптики беспилотникаcamera.position.set(droneMesh.position.x, droneMesh.position.y, droneMesh.position.z);camera.lookAt(targetMesh.position);document.getElementById('crosshair').style.display = 'block';}renderer.render(scene, camera);}// Переключение режимов отображения кнопками пультаfunction changeView(mode) {cameraMode = mode;addLog([ИНТЕРФЕЙС]: Переключение режима камеры на [${mode === 'orbit' ? 'НАВИГАЦИЯ' : 'FPV ОПТИКА'}].);}function addLog(text, className = "") {const div = document.createElement('div');if(className) div.className = className;div.innerText = text;logPanel.appendChild(div);logPanel.scrollTop = logPanel.scrollHeight;}// Выполнение финальной боевой задачиfunction executeMissionAction() {if (!isGameActive) return;isGameActive = false;if (selectedDrone === 'p1sun') {addLog("[УДАР]: Перехватчик P-1SUN выпустил противоракетный гарпун! Воздушная цель уничтожена.", "log-crit");alert("Успешный перехват! Вражеский разведывательный БПЛА ликвидирован перехватчиком P-1SUN.");} else {addLog("[УДАР]: Shahed-236 вошел в пикирование. Прямое попадание по узлу РЛС комплексом камикадзе!", "log-crit");alert("Боевая задача выполнена! Наземная станция РЛС уничтожена.");}window.location.reload();}// Автоматическое изменение размеров 3D окна при повороте смартфонаwindow.addEventListener('resize', () => {if(camera && renderer) {camera.aspect = window.innerWidth / window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth, window.innerHeight);}});
+            
